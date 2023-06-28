@@ -3,7 +3,7 @@
 An application statistics viewer (currently only app time) for the Nintendo Switch.
 
 In the settings of the Nintendo Switch, playtime is only tracked after a game has been
-installed for one week. This app solves this little, but somewhat annoying issue.
+installed for 10 days. This app solves this little, but somewhat annoying issue.
 
 ---
 
@@ -39,6 +39,11 @@ If your computer is less powerful, consider limiting the number of jobs (to 4, f
 
 ```shell
 make -j4
+```
+
+You can turn on optimizations and LTO by setting `build` to release:
+```shell
+make -j{cores} build=release
 ```
 
 ---

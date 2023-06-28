@@ -28,7 +28,7 @@
 #---------------------------------------------------------------------------------
 APP_TITLE	:= PlaytimeNX
 APP_AUTHOR	:= jarvarvarvis
-APP_VERSION	:= 0.0.1
+APP_VERSION	:= 1.0.0
 ICON		:= assets/icon.jpg
 
 TARGET		:=	PlaytimeNX

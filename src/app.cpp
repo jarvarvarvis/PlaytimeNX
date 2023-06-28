@@ -219,11 +219,12 @@ void App::DrawList() {
         gfx::drawText(this->vg, x + title_spacing_left, y + title_spacing_top, 24.f, this->entries[i].name.c_str(), nullptr, NVG_ALIGN_LEFT | NVG_ALIGN_TOP, gfx::Colour::WHITE);
         nvgRestore(this->vg);
 
-        const auto draw_playtime = [&](float x_offset) {
-            gfx::drawTextArgs(this->vg, x + text_spacing_left + x_offset, y + text_spacing_top + 9.f, 22.f, NVG_ALIGN_LEFT | NVG_ALIGN_TOP, gfx::Colour::SILVER, "---");
+        const auto draw_playtime = [&](float x_offset, Playtime playtime) {
+            gfx::drawTextArgs(this->vg, x + text_spacing_left + x_offset, y + text_spacing_top + 9.f, 22.f, NVG_ALIGN_LEFT | NVG_ALIGN_TOP, gfx::Colour::SILVER, 
+                    "Playtime: %s", playtime.toString().c_str());
         };
 
-        draw_playtime(0.f);
+        draw_playtime(0.f, this->entries[i].playtime);
 
         y += box_height;
 
@@ -247,10 +248,10 @@ void App::Sort()
 {
     switch (static_cast<SortType>(this->sort_type))
     {
-        case SortType::Alpha_AZ: std::ranges::sort(this->entries, std::ranges::less{}, &AppEntry::name); break;
-        case SortType::Alpha_ZA: std::ranges::sort(this->entries, std::ranges::greater{}, &AppEntry::name); break;
-        case SortType::Playtime_BigSmall: std::ranges::sort(this->entries, std::ranges::greater{}, &AppEntry::name); break;
-        case SortType::Playtime_SmallBig: std::ranges::sort(this->entries, std::ranges::less{}, &AppEntry::name); break;
+        case SortType::Alpha_AZ: std::ranges::sort(this->entries, [](AppEntry& a, AppEntry& b) { return a.name < b.name; }); break;
+        case SortType::Alpha_ZA: std::ranges::sort(this->entries, [](AppEntry& a, AppEntry& b) { return a.name > b.name; }); break;
+        case SortType::Playtime_BigSmall: std::ranges::sort(this->entries, [](AppEntry& a, AppEntry& b) { return a.playtime.totalSeconds() > b.playtime.totalSeconds(); }); break;
+        case SortType::Playtime_SmallBig: std::ranges::sort(this->entries, [](AppEntry& a, AppEntry& b) { return a.playtime.totalSeconds() < b.playtime.totalSeconds(); }); break;
     }
 }
 
@@ -319,6 +320,10 @@ void App::UpdateList() {
     } 
 }
 
+#define SECONDS_PER_HOUR 3600
+#define NANOSECONDS_PER_SECOND 1000000000
+#define SECONDS_PER_MINUTE 60
+
 // NOTE: there's a chance that we run out of memory here
 // if the user has a *lot* of games installed.
 void App::Scan(std::stop_token stop_token) {
@@ -330,6 +335,7 @@ void App::Scan(std::stop_token stop_token) {
     auto control_data = std::make_unique<NsApplicationControlData>();
     std::array<NsApplicationRecord, 30> record_list;
     ApplicationOccupiedSize size{};
+    PdmPlayStatistics pdm_play_statistics[1] = {0};
 
     for (;;) {
         s32 record_count{};
@@ -338,6 +344,7 @@ void App::Scan(std::stop_token stop_token) {
             LOG("failed to get record count\n");
             goto done;
         }
+
         // either we have ran out of games or we have no games installed.
         if (record_count == 0) {
             LOG("record count is 0\n");
@@ -345,44 +352,58 @@ void App::Scan(std::stop_token stop_token) {
         }
 
         for (auto i = 0; i < record_count && !stop_token.stop_requested(); i++) {
+            LOG("Current application: %lX\n", record_list[i].application_id);
+
+            bool corrupted_install = false;
             AppEntry entry;
             result = nsGetApplicationControlData(NsApplicationControlSource_Storage, record_list[i].application_id, control_data.get(), sizeof(NsApplicationControlData), &jpeg_size);
             // can fail with very messed up piracy installs, it would fail in ofw as well.
             if (R_FAILED(result)) {
                 LOG("failed to get control data for %lX\n", record_list[i].application_id);
-                goto corrupted_install;
+                corrupted_install = true;
+            }
+
+            result = nsGetApplicationDesiredLanguage(&control_data->nacp, &language_entry);
+            if (R_FAILED(result)) {
+                LOG("failed to get lang data\n");
+                corrupted_install = true;
+            }
+
+            // get play statistics of application
+            result = pdmqryQueryPlayStatisticsByApplicationIdAndUserAccountId(record_list[i].application_id, this->account_uid, false, pdm_play_statistics);
+            if (R_FAILED(result)) {
+                LOG("Failed getting time of application. Result: %d\n", result);
+                corrupted_install = true;
+            }
+
+            if (!corrupted_install) {
+                u64 playtimeSeconds = pdm_play_statistics->playtime / NANOSECONDS_PER_SECOND;
+                u64 playtimeHours = playtimeSeconds / SECONDS_PER_HOUR;
+                playtimeSeconds -= playtimeHours * SECONDS_PER_HOUR;
+                u64 playtimeMinutes = playtimeSeconds / SECONDS_PER_MINUTE;
+                playtimeSeconds -= playtimeMinutes * SECONDS_PER_MINUTE;
+
+                entry.name = language_entry->name;
+                entry.author = language_entry->author;
+                entry.display_version = control_data->nacp.display_version;
+                entry.id = record_list[i].application_id;
+                assert((jpeg_size - sizeof(NacpStruct)) > 0 && "jpeg size is smaller than the size of NacpStruct");
+                entry.image = nvgCreateImageMem(this->vg, 0, control_data->icon, jpeg_size - sizeof(NacpStruct));
+                entry.own_image = true; // we own it
+                entry.playtime = Playtime(playtimeHours, playtimeMinutes, playtimeSeconds);
+                this->entries.emplace_back(std::move(entry));
+                count++;
             } else {
-                result = nsGetApplicationDesiredLanguage(&control_data->nacp, &language_entry);
-                if (R_FAILED(result)) {
-                    LOG("failed to get lang data\n");
-                    goto corrupted_install;
-                } else {
-                    entry.name = language_entry->name;
-                    entry.author = language_entry->author;
-                    entry.display_version = control_data->nacp.display_version;
-                    entry.id = record_list[i].application_id;
-                    assert((jpeg_size - sizeof(NacpStruct)) > 0 && "jpeg size is smaller than the size of NacpStruct");
-                    entry.image = nvgCreateImageMem(this->vg, 0, control_data->icon, jpeg_size - sizeof(NacpStruct));
-                    entry.own_image = true; // we own it
-                    // entry.image = this->default_icon_image;
-                    // entry.own_image = false; // we don't own it
-                    // LOG("added %s\n", entry.name.c_str());
-                    this->entries.emplace_back(std::move(entry));
-                    count++;
-
-                    continue;
-
-                corrupted_install:
-                    entry.name = "Corrupted";
-                    entry.author = "Corrupted";
-                    entry.display_version = "Corrupted";
-                    entry.id = record_list[i].application_id;
-                    entry.image = this->default_icon_image;
-                    entry.own_image = false; // we don't own it
-                    this->entries.emplace_back(std::move(entry));
-                    this->has_corrupted = true;
-                    count++;
-                }
+                entry.name = "Corrupted";
+                entry.author = "Corrupted";
+                entry.display_version = "Corrupted";
+                entry.id = record_list[i].application_id;
+                entry.image = this->default_icon_image;
+                entry.own_image = false; // we don't own it
+                entry.playtime = Playtime(0, 0, 0);
+                this->entries.emplace_back(std::move(entry));
+                this->has_corrupted = true;
+                count++;
             }
         }
 
@@ -397,6 +418,28 @@ void App::Scan(std::stop_token stop_token) {
 done:
     std::scoped_lock lock{this->mutex};
     this->finished_scanning = true;
+}
+
+void App::SpawnScanThread() {
+    // todo: handle errors
+    this->async_thread = util::async([this](std::stop_token stop_token){
+            this->Scan(stop_token);
+        }
+    );
+}
+
+void App::RequestAccountUid() {
+    PselUserSelectionSettings pselUserSelectionSettings;
+
+    memset(&pselUserSelectionSettings, 0, sizeof(pselUserSelectionSettings));
+    memset(&this->account_uid, 0, sizeof(this->account_uid));
+
+    Result result = pselShowUserSelector(&this->account_uid, &pselUserSelectionSettings);
+    if (R_FAILED(result)) {
+        LOG("Failed getting user id. Result: %d\n", result);
+    }
+
+    LOG("Selected user.\n");
 }
 
 App::App() {
@@ -439,12 +482,6 @@ App::App() {
 
     nvgAddFallbackFontId(this->vg, standard_font, extended_font);
     this->default_icon_image = nvgCreateImage(this->vg, "romfs:/default_icon.jpg", NVG_IMAGE_NEAREST);
-
-    // todo: handle errors
-    this->async_thread = util::async([this](std::stop_token stop_token){
-            this->Scan(stop_token);
-        }
-    );
 
     padConfigureInput(1, HidNpadStyleSet_NpadStandard);
     padInitializeDefault(&this->pad);

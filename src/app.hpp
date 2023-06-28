@@ -3,6 +3,7 @@
 #include "nanovg/nanovg.h"
 #include "nanovg/deko3d/dk_renderer.hpp"
 #include "async.hpp"
+#include "playtime.hpp"
 
 #include <switch.h>
 #include <cstdint>
@@ -51,6 +52,7 @@ struct AppEntry final {
     std::string name;
     std::string author;
     std::string display_version;
+    Playtime playtime;
     AppID id;
     int image;
     bool own_image{false};
@@ -62,12 +64,15 @@ public:
     ~App();
     void Loop();
 
+    void SpawnScanThread();
+    void RequestAccountUid();
+
 private:
     NVGcontext* vg{nullptr};
     std::vector<AppEntry> entries;
     PadState pad{};
     Controller controller{};
-    int default_icon_image{};
+    AccountUid account_uid;
 
     util::AsyncFuture<void> async_thread;
     std::mutex mutex{};
@@ -80,6 +85,7 @@ private:
     std::size_t start{0};
     std::size_t index{}; // where i am in the array
     MenuMode menu_mode{MenuMode::LOAD};
+    int default_icon_image{};
     bool has_corrupted{false};
     bool quit{false};
 

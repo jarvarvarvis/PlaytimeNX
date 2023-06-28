@@ -13,6 +13,8 @@ void userAppInit(void) {
     THROW_IF(romfsInit());
     THROW_IF(plInitialize(PlServiceType_User));
     THROW_IF(nsInitialize());
+    THROW_IF(pdmqryInitialize());
+    THROW_IF(accountInitialize(AccountServiceType_Administrator));
 #ifndef NDEBUG
     THROW_IF(socketInitializeDefault());
     nxlink_socket = nxlinkStdio();
@@ -24,6 +26,8 @@ void userAppExit(void) {
     close(nxlink_socket);
     socketExit();
 #endif // NDEBUG
+    accountExit();
+    pdmqryExit();
     plExit();
     nsExit();
     romfsExit();
@@ -33,6 +37,8 @@ void userAppExit(void) {
 
 int main(int argc, char** argv) {
     tj::App app{};
+    app.RequestAccountUid();
+    app.SpawnScanThread();
     app.Loop();
     return 0;
 }

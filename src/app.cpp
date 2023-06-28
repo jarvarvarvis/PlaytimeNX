@@ -213,7 +213,7 @@ void App::DrawList() {
 // source: https://stackoverflow.com/a/2411008
 #define STRINGIZE(x) #x
 #define STRINGIZE_VALUE_OF(x) STRINGIZE(x)
-    gfx::drawText(this->vg, 70.f, 40.f, 28.f, "Software", nullptr, NVG_ALIGN_LEFT | NVG_ALIGN_TOP, gfx::Colour::WHITE);
+    gfx::drawText(this->vg, 70.f, 40.f, 28.f, STRINGIZE_VALUE_OF(APP_TITLE), nullptr, NVG_ALIGN_LEFT | NVG_ALIGN_TOP, gfx::Colour::WHITE);
     gfx::drawText(this->vg, 1224.f, 45.f, 22.f, STRINGIZE_VALUE_OF(APP_VERSION_STRING), nullptr, NVG_ALIGN_RIGHT | NVG_ALIGN_TOP, gfx::Colour::SILVER);
 #undef STRINGIZE
 #undef STRINGIZE_VALUE_OF

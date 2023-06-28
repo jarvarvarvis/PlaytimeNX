@@ -58,7 +58,8 @@ MY_DEFINES	:=	-Wall #-Wextra #-Werror # todo: fix warns soon
 # stb (we only need jpeg for ns icons)
 MY_DEFINES	+=	-DSTBI_ONLY_JPEG
 # version
-MY_DEFINES	+= -DAPP_VERSION_STRING=$(APP_VERSION)
+MY_DEFINES	+= -DAPP_TITLE=$(APP_TITLE) \
+               -DAPP_VERSION_STRING=$(APP_VERSION)
 
 CFLAGS := $(ARCH) $(DEFINES) $(MY_DEFINES)
 CFLAGS	+=	$(INCLUDE) -D__SWITCH__

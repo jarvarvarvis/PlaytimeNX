@@ -8,18 +8,18 @@ namespace util {
 // simple wrapper for future + stop token.
 // todo: write my own std::async with token source added, like jthread.
 template<typename T>
-class AsyncFurture {
+class AsyncFuture {
 public:
-    constexpr AsyncFurture() = default;
-    constexpr AsyncFurture(AsyncFurture&& token)
+    constexpr AsyncFuture() = default;
+    constexpr AsyncFuture(AsyncFuture&& token)
     : future{std::move(token.future)}
     , stop_source{std::move(token.stop_source)} {}
-    constexpr AsyncFurture(std::future<T>&& f)
+    constexpr AsyncFuture(std::future<T>&& f)
     : future{std::forward<std::future<T>>(f)} {}
-    constexpr AsyncFurture(std::future<T>&& f, std::stop_source&& ss)
+    constexpr AsyncFuture(std::future<T>&& f, std::stop_source&& ss)
     : future{std::forward<std::future<T>>(f)}
     , stop_source{std::forward<std::stop_source>(ss)} {}
-    ~AsyncFurture() {
+    ~AsyncFuture() {
         if (this->future.valid()) {
             this->stop_source.request_stop();
             this->future.get();
@@ -27,10 +27,10 @@ public:
     }
 
     // disable copying
-    AsyncFurture(const AsyncFurture&) = delete;
-    AsyncFurture& operator=(const AsyncFurture& f) = delete;
+    AsyncFuture(const AsyncFuture&) = delete;
+    AsyncFuture& operator=(const AsyncFuture& f) = delete;
 
-    AsyncFurture<T>& operator=(AsyncFurture<T>&& f) noexcept {
+    AsyncFuture<T>& operator=(AsyncFuture<T>&& f) noexcept {
         this->future = std::move(f.future);
         this->stop_source = std::move(f.stop_source);
         return *this;
@@ -88,9 +88,9 @@ using AsyncResult = typename std::invoke_result<
 
 // enabled if function DOES start with std::stop_token
 template<typename Fn, typename... Args, typename = std::enable_if<std::is_invocable_v<std::decay_t<Fn>, std::stop_token, std::decay_t<Args>...>>>
-auto async(Fn&& fn, Args&&... args) -> AsyncFurture<AsyncResult<Fn, std::stop_token, Args...>> {
+auto async(Fn&& fn, Args&&... args) -> AsyncFuture<AsyncResult<Fn, std::stop_token, Args...>> {
     std::stop_source source_token;
-    return AsyncFurture{
+    return AsyncFuture{
         std::async(std::launch::async, std::forward<Fn>(fn), source_token.get_token(), std::forward<Args>(args)...),
         std::move(source_token)
     };
@@ -98,8 +98,8 @@ auto async(Fn&& fn, Args&&... args) -> AsyncFurture<AsyncResult<Fn, std::stop_to
 
 // enabled if function does NOT start with std::stop_token
 template<typename Fn, typename... Args, typename = std::enable_if<!std::is_invocable_v<std::decay_t<Fn>, std::stop_token, std::decay_t<Args>...>>>
-auto async(Fn&& fn, Args&&... args) -> AsyncFurture<AsyncResult<Fn, Args...>> {
-    return AsyncFurture{
+auto async(Fn&& fn, Args&&... args) -> AsyncFuture<AsyncResult<Fn, Args...>> {
+    return AsyncFuture{
         std::async(std::launch::async, std::forward<Fn>(fn), std::forward<Args>(args)...)
     };
 }

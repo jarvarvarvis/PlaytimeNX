@@ -90,23 +90,6 @@ void App::Poll() {
 
     this->controller.UpdateButtonHeld(this->controller.DOWN, held & HidNpadButton_AnyDown);
     this->controller.UpdateButtonHeld(this->controller.UP, held & HidNpadButton_AnyUp);
-
-#ifndef NDEBUG
-    auto display = [](const char* str, bool key) {
-        if (key) {
-            LOG("Key %s is Pressed\n", str);
-        }
-    };
-
-    display("A", this->controller.A);
-    display("B", this->controller.B);
-    display("X", this->controller.X);
-    display("Y", this->controller.Y);
-    display("L", this->controller.L);
-    display("R", this->controller.R);
-    display("L2", this->controller.L2);
-    display("R2", this->controller.R2);
-#endif
 }
 
 void App::Update() {
@@ -281,7 +264,6 @@ void App::UpdateList() {
             this->index++;
             this->ypos += this->BOX_HEIGHT;
             if ((this->ypos + this->BOX_HEIGHT) > 646.f) {
-                LOG("moved down\n");
                 this->ypos -= this->BOX_HEIGHT;
                 this->yoff = this->ypos - ((this->index - this->start - 1) * this->BOX_HEIGHT);
                 this->start++;
@@ -292,7 +274,6 @@ void App::UpdateList() {
             this->index--;
             this->ypos -= this->BOX_HEIGHT;
             if (this->ypos < 86.f) {
-                LOG("moved up\n");
                 this->ypos += this->BOX_HEIGHT;
                 this->yoff = this->ypos;
                 this->start--;
@@ -341,7 +322,9 @@ void App::Scan(std::stop_token stop_token) {
         }
 
         for (auto i = 0; i < record_count && !stop_token.stop_requested(); i++) {
+#ifndef NDEBUG
             LOG("Current application: %lX\n", record_list[i].application_id);
+#endif
 
             bool corrupted_install = false;
             AppEntry entry;
@@ -428,7 +411,9 @@ void App::RequestAccountUid() {
         LOG("Failed getting user id. Result: %d\n", result);
     }
 
+#ifndef NDEBUG
     LOG("Selected user.\n");
+#endif
 }
 
 App::App() {

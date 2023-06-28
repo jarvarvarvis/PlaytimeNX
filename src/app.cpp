@@ -66,21 +66,6 @@ void App::Loop() {
     }
 }
 
-void Controller::UpdateButtonHeld(bool& down, bool held) {
-    if (down) {
-        this->step = 50;
-        this->counter = 0;
-    } else if (held) {
-        this->counter += this->step;
-
-        if (this->counter >= this->MAX) {
-            down = true;
-            this->counter = 0;
-            this->step = std::min(this->step + 50, this->MAX_STEP);
-        }
-    }
-}
-
 void App::Poll() {
     padUpdate(&this->pad);
 
@@ -236,7 +221,11 @@ void App::DrawList() {
 
     nvgRestore(this->vg);
 
-    gfx::drawTextArgs(this->vg, 55.f, 670.f, 24.f, NVG_ALIGN_LEFT | NVG_ALIGN_TOP, gfx::Colour::WHITE, "Selected: %lu / %lu", this->index + 1, this->entries.size());
+    AppEntry current_entry = this->entries[this->index];
+    gfx::drawTextArgs(this->vg, 55.f, 670.f, 24.f, NVG_ALIGN_LEFT | NVG_ALIGN_TOP, gfx::Colour::WHITE, 
+            "Current (%lu / %lu): %s", 
+                this->index + 1, this->entries.size(), 
+                current_entry.playtime.toString().c_str());
 
     gfx::drawButtons(this->vg, 
             gfx::pair{gfx::Button::B, "Exit"}, 

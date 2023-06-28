@@ -256,6 +256,8 @@ void App::DrawList() {
 
     nvgRestore(this->vg);
 
+    gfx::drawTextArgs(this->vg, 55.f, 670.f, 24.f, NVG_ALIGN_LEFT | NVG_ALIGN_TOP, gfx::Colour::WHITE, "Selected: %lu / %lu", this->index + 1, this->entries.size());
+
     gfx::drawButtons(this->vg, 
             gfx::pair{gfx::Button::B, "Exit"}, 
             gfx::pair{gfx::Button::R, this->GetSortStr()});

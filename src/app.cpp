@@ -219,32 +219,11 @@ void App::DrawList() {
         gfx::drawText(this->vg, x + title_spacing_left, y + title_spacing_top, 24.f, this->entries[i].name.c_str(), nullptr, NVG_ALIGN_LEFT | NVG_ALIGN_TOP, gfx::Colour::WHITE);
         nvgRestore(this->vg);
 
-        const auto draw_size = [&](float x_offset, size_t size, const char* name) {
-            if (size == 0) {
-                gfx::drawTextArgs(this->vg, x + text_spacing_left + x_offset, y + text_spacing_top + 9.f, 22.f, NVG_ALIGN_LEFT | NVG_ALIGN_TOP, gfx::Colour::SILVER, "%s: ---", name);
-            } else {
-                if (size >= 1024 * 1024 * 1024) {
-                    if (size >= 1024ULL * 1024ULL * 1024ULL * 100ULL) { // no decimal
-                        gfx::drawTextArgs(this->vg, x + text_spacing_left + x_offset, y + text_spacing_top + 9.f, 22.f, NVG_ALIGN_LEFT | NVG_ALIGN_TOP, gfx::Colour::SILVER, 
-                                "%s: %.0f %s", name, static_cast<float>(size) / static_cast<float>(1024*1024*1024), "GB");
-                    } else { // use decimal
-                        gfx::drawTextArgs(this->vg, x + text_spacing_left + x_offset, y + text_spacing_top + 9.f, 22.f, NVG_ALIGN_LEFT | NVG_ALIGN_TOP, gfx::Colour::SILVER, 
-                                "%s: %.1f %s", name, static_cast<float>(size) / static_cast<float>(1024*1024*1024), "GB");
-                    }
-                } else {
-                    if (size >= 1024 * 1024 * 100) { // no decimal
-                        gfx::drawTextArgs(this->vg, x + text_spacing_left + x_offset, y + text_spacing_top + 9.f, 22.f, NVG_ALIGN_LEFT | NVG_ALIGN_TOP, gfx::Colour::SILVER, 
-                                "%s: %.0f %s", name, static_cast<float>(size) / static_cast<float>(1024*1024), "MB");
-                    } else { // use decimal
-                        gfx::drawTextArgs(this->vg, x + text_spacing_left + x_offset, y + text_spacing_top + 9.f, 22.f, NVG_ALIGN_LEFT | NVG_ALIGN_TOP, gfx::Colour::SILVER, 
-                                "%s: %.1f %s", name, static_cast<float>(size) / static_cast<float>(1024*1024), "MB");
-                    }
-                }
-            }
+        const auto draw_playtime = [&](float x_offset) {
+            gfx::drawTextArgs(this->vg, x + text_spacing_left + x_offset, y + text_spacing_top + 9.f, 22.f, NVG_ALIGN_LEFT | NVG_ALIGN_TOP, gfx::Colour::SILVER, "---");
         };
 
-        draw_size(0.f, this->entries[i].size_nand, "Nand");
-        draw_size(180.f, this->entries[i].size_sd, "Sd");
+        draw_playtime(0.f);
 
         y += box_height;
 
@@ -270,8 +249,8 @@ void App::Sort()
     {
         case SortType::Alpha_AZ: std::ranges::sort(this->entries, std::ranges::less{}, &AppEntry::name); break;
         case SortType::Alpha_ZA: std::ranges::sort(this->entries, std::ranges::greater{}, &AppEntry::name); break;
-        case SortType::Size_BigSmall: std::ranges::sort(this->entries, std::ranges::greater{}, &AppEntry::size_total); break;
-        case SortType::Size_SmallBig: std::ranges::sort(this->entries, std::ranges::less{}, &AppEntry::size_total); break;
+        case SortType::Playtime_BigSmall: std::ranges::sort(this->entries, std::ranges::greater{}, &AppEntry::name); break;
+        case SortType::Playtime_SmallBig: std::ranges::sort(this->entries, std::ranges::less{}, &AppEntry::name); break;
     }
 }
 
@@ -279,8 +258,8 @@ const char* App::GetSortStr() {
     switch (static_cast<SortType>(this->sort_type)) {
         case SortType::Alpha_AZ: return "Sort Alpha: A-Z";
         case SortType::Alpha_ZA: return "Sort Alpha: Z-A";
-        case SortType::Size_BigSmall: return "Sort Size: 9-0";
-        case SortType::Size_SmallBig: return "Sort Size: 0-9";
+        case SortType::Playtime_BigSmall: return "Sort Playtime: 9-0";
+        case SortType::Playtime_SmallBig: return "Sort Playtime: 0-9";
     }
 
     std::unreachable();
@@ -378,31 +357,6 @@ void App::Scan(std::stop_token stop_token) {
                     LOG("failed to get lang data\n");
                     goto corrupted_install;
                 } else {
-                    result = nsCalculateApplicationOccupiedSize(record_list[i].application_id, (NsApplicationOccupiedSize*)&size);
-                    if (R_FAILED(result)) {
-                        LOG("failed to get application occupied size for ID %lX\n", record_list[i].application_id);
-                        entry.size_total = entry.size_nand = entry.size_sd = 0;
-                    } else {
-                        auto fill_size = [&](const ApplicationOccupiedSizeEntry& e) {
-                            switch (e.storageId) {
-                                case NcmStorageId_BuiltInUser:
-                                    entry.size_nand = e.sizeApplication + e.sizeAddOnContent + e.sizePatch;
-                                    break;
-                                case NcmStorageId_SdCard:
-                                    entry.size_sd = e.sizeApplication + e.sizeAddOnContent + e.sizePatch;
-                                    break;
-                                default:
-                                    assert(0 && "unk ncm storageID when getting size!");
-                                    break;
-                            }
-                        };
-                        // unsure if the order of the storageID will always be nand then sd.
-                        // because of this, i manually check using a switch (for now).
-                        fill_size(size.entry[0]);
-                        fill_size(size.entry[1]);
-                        entry.size_total = entry.size_nand + entry.size_sd;
-                    }
-
                     entry.name = language_entry->name;
                     entry.author = language_entry->author;
                     entry.display_version = control_data->nacp.display_version;
@@ -446,16 +400,6 @@ done:
 }
 
 App::App() {
-    nsGetTotalSpaceSize(NcmStorageId_SdCard, (s64*)&this->sdcard_storage_size_total);
-    nsGetFreeSpaceSize(NcmStorageId_SdCard, (s64*)&this->sdcard_storage_size_free);
-    nsGetTotalSpaceSize(NcmStorageId_BuiltInUser, (s64*)&this->nand_storage_size_total);
-    nsGetFreeSpaceSize(NcmStorageId_BuiltInUser, (s64*)&this->nand_storage_size_free);
-    this->nand_storage_size_used = this->nand_storage_size_total - this->nand_storage_size_free;
-    this->sdcard_storage_size_used = this->sdcard_storage_size_total - this->sdcard_storage_size_free;
-
-    LOG("nand total: %lu free: %lu used: %lu\n", this->nand_storage_size_total, this->nand_storage_size_free, this->nand_storage_size_used);
-    LOG("sdcard total: %lu free: %lu used: %lu\n", this->sdcard_storage_size_total, this->sdcard_storage_size_free, this->sdcard_storage_size_used);
-
     PlFontData font_standard, font_extended;
     plGetSharedFontByType(&font_standard, PlSharedFontType_Standard);
     plGetSharedFontByType(&font_extended, PlSharedFontType_NintendoExt);

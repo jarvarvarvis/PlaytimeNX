@@ -51,9 +51,6 @@ struct AppEntry final {
     std::string name;
     std::string author;
     std::string display_version;
-    std::size_t size_nand;
-    std::size_t size_sd;
-    std::size_t size_total;
     AppID id;
     int image;
     bool own_image{false};
@@ -72,13 +69,6 @@ private:
     Controller controller{};
     int default_icon_image{};
 
-    std::size_t nand_storage_size_total{};
-    std::size_t nand_storage_size_used{};
-    std::size_t nand_storage_size_free{};
-    std::size_t sdcard_storage_size_total{};
-    std::size_t sdcard_storage_size_used{};
-    std::size_t sdcard_storage_size_free{};
-
     util::AsyncFuture<void> async_thread;
     std::mutex mutex{};
     bool finished_scanning{false}; // mutex locked
@@ -96,12 +86,12 @@ private:
     enum class SortType {
         Alpha_AZ,
         Alpha_ZA,
-        Size_BigSmall,
-        Size_SmallBig,
+        Playtime_BigSmall,
+        Playtime_SmallBig,
         MAX,
     };
 
-    uint8_t sort_type{std::to_underlying(SortType::Size_BigSmall)};
+    uint8_t sort_type{std::to_underlying(SortType::Playtime_BigSmall)};
 
     void Draw();
     void Update();

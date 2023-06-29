@@ -5,7 +5,9 @@ An application statistics viewer (currently only app time) for the Nintendo Swit
 In the settings of the Nintendo Switch, playtime is only tracked after a game has been
 installed for 10 days. This app solves this little, but somewhat annoying issue.
 
----
+## Screenshots
+
+![](assets/example_01.jpg)
 
 ## Building
 

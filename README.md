@@ -52,7 +52,7 @@ make -j{cores} build=release
 
 ## Credits
 
-Special thanks to the person who wrote untitled, which the GUI of PlaytimeNX is using.
+Special thanks to the person who wrote untitled, as PlaytimeNX is based on their codebase.
 
 - [untitled](https://github.com/ITotalJustice/untitled/)
 
